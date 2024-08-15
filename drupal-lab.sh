@@ -297,7 +297,7 @@ build_project() {
 
 main() {
   if [[ "$#" -lt 1 ]]; then
-    printf "Usage: drupal-lab {new-project|remove-project|remove-all|build} [project-name]\n" >&2
+    printf "Usage: drupal-lab {new|remove|remove-all|build} [project-name]\n" >&2
     return 1
   fi
 
