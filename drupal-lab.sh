@@ -317,7 +317,7 @@ main() {
       build_project "$2"
       ;;
     *)
-      printf "Invalid command. Usage: drupal-lab {new-project|remove-project|remove-all|build} [project-name]\n" >&2
+      printf "Invalid command. Usage: drupal-lab {new|remove|remove-all|build} [project-name]\n" >&2
       return 1
       ;;
   esac
