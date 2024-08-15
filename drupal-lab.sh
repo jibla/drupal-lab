@@ -1,47 +1,47 @@
 #!/bin/bash
 
-# Function to check if DDEV is installed
+DDEV="ddev"
+
 check_ddev() {
-  if ! command -v ddev &> /dev/null; then
-    echo "DDEV is not installed. Please install DDEV before running this script."
-    exit 1
+  if ! command -v "$DDEV" &> /dev/null; then
+    printf "DDEV is not installed. Please install DDEV before running this script.\n" >&2
+    return 1
   fi
+  return 0
 }
 
-# Function to create a new Drupal project
 new_project() {
-  local machine_name
-  local site_name
+  local machine_name site_name
   
-  read -p "Enter the machine name: " machine_name
+  read -r -p "Enter the machine name: " machine_name
   if [[ ! "$machine_name" =~ ^[a-z][-a-z0-9]*$ ]]; then
-    echo "Invalid machine name. It must start with a lowercase letter, and can only contain lowercase letters, digits, and hyphens."
-    exit 1
+    printf "Invalid machine name. It must start with a lowercase letter, and can only contain lowercase letters, digits, and hyphens.\n" >&2
+    return 1
   fi
 
-  read -p "Enter the site name: " site_name
-  if [ -z "$site_name" ]; then
-    echo "Site name cannot be empty."
-    exit 1
+  read -r -p "Enter the site name: " site_name
+  if [[ -z "$site_name" ]]; then
+    printf "Site name cannot be empty.\n" >&2
+    return 1
   fi
 
-  if [ -d "$machine_name" ]; then
-    echo "Directory '$machine_name' already exists. Please choose a different machine name."
-    exit 1
+  if [[ -d "$machine_name" ]]; then
+    printf "Directory '%s' already exists. Please choose a different machine name.\n" "$machine_name" >&2
+    return 1
   fi
 
-  mkdir "$machine_name"
-  cd "$machine_name" || exit
+  mkdir -p "$machine_name"
+  cd "$machine_name" || return 1
 
-  ddev config --project-type=drupal --php-version=8.3 --docroot=web --project-name="$machine_name"
-  ddev start
-  ddev composer create drupal/recommended-project:^10
+  "$DDEV" config --project-type=drupal --php-version=8.3 --docroot=web --project-name="$machine_name"
+  "$DDEV" start || return 1
+  "$DDEV" composer create drupal/recommended-project:^10 || return 1
   
-  # Create config/sync directory above the web folder
   mkdir -p config/sync
 
+
   # Create settings.prod.php in web/sites/default/
-  cat <<EOL > web/sites/default/settings.prod.php
+  cat <<'EOL' > ./web/sites/default/settings.prod.php
 <?php
 
 /**
@@ -53,65 +53,66 @@ new_project() {
 // ** Environment Variables Configuration **
 
 // Database settings
-\$databases['default']['default'] = [
+$databases['default']['default'] = [
   'driver' => 'mysql',
-  'database' => getenv('DB_NAME') ?: 'drupal',
-  'username' => getenv('DB_USER') ?: 'drupal',
-  'password' => getenv('DB_PASSWORD') ?: 'secret',
-  'host' => getenv('DB_HOST') ?: '127.0.0.1',
-  'port' => getenv('DB_PORT') ?: '3306',
+  'database' => getenv('DB_NAME'),
+  'username' => getenv('DB_USER'),
+  'password' => getenv('DB_PASSWORD'),
+  'host' => getenv('DB_HOST'),
+  'port' => getenv('DB_PORT'),
   'prefix' => '',
   'collation' => 'utf8mb4_general_ci',
   'charset' => 'utf8mb4',
 ];
 
 // Trusted host patterns to prevent host header poisoning
-\$settings['trusted_host_patterns'] = [
+$settings['trusted_host_patterns'] = [
   '^' . preg_quote(getenv('DRUPAL_TRUSTED_HOST_PATTERN') ?: 'www.example.com') . '$',
 ];
 
 // Hash salt for security
-\$settings['hash_salt'] = getenv('DRUPAL_HASH_SALT') ?: 'random-hash-value';
+$settings['hash_salt'] = getenv('DRUPAL_HASH_SALT') ?: 'random-hash-value';
 
 // File system paths
-\$settings['file_public_path'] = getenv('DRUPAL_FILE_PUBLIC_PATH') ?: 'sites/default/files';
-\$settings['file_private_path'] = getenv('DRUPAL_FILE_PRIVATE_PATH') ?: 'sites/default/files/private';
-\$settings['file_temp_path'] = getenv('DRUPAL_FILE_TEMP_PATH') ?: '/tmp';
+$settings['file_public_path'] = getenv('DRUPAL_FILE_PUBLIC_PATH') ?: 'sites/default/files';
+$settings['file_private_path'] = getenv('DRUPAL_FILE_PRIVATE_PATH') ?: 'sites/default/files/private';
+$settings['file_temp_path'] = getenv('DRUPAL_FILE_TEMP_PATH') ?: '/tmp';
 
 // Disable development services
-\$config['system.logging']['error_level'] = 'hide';
-\$config['system.performance']['cache']['page']['max_age'] = 900;
-\$config['system.performance']['css']['preprocess'] = TRUE;
-\$config['system.performance']['js']['preprocess'] = TRUE;
-\$settings['cache']['default'] = 'cache.backend.redis';
-\$settings['redis.connection']['interface'] = 'PhpRedis';
-\$settings['redis.connection']['host'] = getenv('REDIS_HOST') ?: '127.0.0.1';
-\$settings['redis.connection']['port'] = getenv('REDIS_PORT') ?: 6379;
+//$config['system.logging']['error_level'] = 'hide';
+//$config['system.performance']['cache']['page']['max_age'] = 900;
+//$config['system.performance']['css']['preprocess'] = TRUE;
+//$config['system.performance']['js']['preprocess'] = TRUE;
+//$settings['cache']['default'] = 'cache.backend.redis';
+//$settings['redis.connection']['interface'] = 'PhpRedis';
+//$settings['redis.connection']['host'] = getenv('REDIS_HOST') ?: '127.0.0.1';
+//$settings['redis.connection']['port'] = getenv('REDIS_PORT') ?: 6379;
 
 // Set session cookie to be secure
 ini_set('session.cookie_secure', '1');
 
 // Reverse proxy settings (if behind a load balancer or reverse proxy)
 if (getenv('DRUPAL_REVERSE_PROXY') === 'true') {
-  \$settings['reverse_proxy'] = TRUE;
-  \$settings['reverse_proxy_addresses'] = explode(',', getenv('DRUPAL_REVERSE_PROXY_ADDRESSES') ?: '');
+  $settings['reverse_proxy'] = TRUE;
+  $settings['reverse_proxy_addresses'] = explode(',', getenv('DRUPAL_REVERSE_PROXY_ADDRESSES') ?: '');
 }
 
 // Other recommended settings for production
-\$settings['update_free_access'] = FALSE;
-\$settings['allow_authorize_operations'] = FALSE;
-\$settings['skip_permissions_hardening'] = TRUE;
+$settings['update_free_access'] = FALSE;
+$settings['allow_authorize_operations'] = FALSE;
+$settings['skip_permissions_hardening'] = TRUE;
+
 EOL
 
   # Append to web/sites/default/settings.php
-  cat <<EOL >> web/sites/default/settings.php
-\$settings['config_sync_directory'] = '../config/sync';
+  cat <<'EOL' >> ./web/sites/default/settings.php
+$settings['config_sync_directory'] = '../config/sync';
 
 if (getenv('DRUPAL_ENVIRONMENT')) {
-  \$env = getenv('DRUPAL_ENVIRONMENT');
-  \$settings_file = __DIR__ . "/settings.\$env.php";
-  if (file_exists(\$settings_file)) {
-    include \$settings_file;
+  $env = getenv('DRUPAL_ENVIRONMENT');
+  $settings_file = __DIR__ . "/settings.$env.php";
+  if (file_exists($settings_file)) {
+    include $settings_file;
   }
 } else {
   if (file_exists(__DIR__ . '/settings.local.php')) {
@@ -120,86 +121,122 @@ if (getenv('DRUPAL_ENVIRONMENT')) {
 }
 EOL
 
-  # Create .build/Dockerfile
+  # Create .build/Dockerfile and Caddyfile
   mkdir -p .build
-  cat <<EOL > .build/Dockerfile
+  cat <<'EOL' > ./.build/Dockerfile
 # Stage 1: Build stage
-FROM php:8.3-fpm-alpine AS build
+FROM php:8.3-cli AS build
 
-# Install build dependencies
-RUN apk add --no-cache \\
-    git \\
-    curl \\
-    libpng-dev \\
-    libjpeg-turbo-dev \\
-    libwebp-dev \\
-    freetype-dev \\
-    libzip-dev \\
-    icu-dev \\
-    libxml2-dev \\
-    oniguruma-dev \\
-    unzip \\
-    bash
+# Install build dependencies and PHP extensions in one RUN command
+RUN apt-get update && apt-get install -y \
+    git \
+    curl \
+    libpng-dev \
+    libjpeg-dev \
+    libwebp-dev \
+    libfreetype6-dev \
+    libzip-dev \
+    libicu-dev \
+    libxml2-dev \
+    libonig-dev \
+    unzip \
+    bash \
+    && rm -rf /var/lib/apt/lists/* \
+    && docker-php-ext-configure gd --with-freetype --with-jpeg --with-webp \
+    && docker-php-ext-install -j$(nproc) gd intl zip opcache pdo pdo_mysql mbstring bcmath
 
 # Install Composer
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
-# Install PHP extensions
-RUN docker-php-ext-configure gd --with-freetype --with-jpeg --with-webp && \\
-    docker-php-ext-install -j\$(nproc) gd intl zip opcache pdo pdo_mysql mbstring bcmath
-
 # Set working directory
 WORKDIR /var/www/html
 
-# Copy only necessary files for Composer
+# Copy Composer files and install dependencies
 COPY ./composer.json ./composer.lock ./
-
-# Install PHP dependencies (without development packages)
-RUN composer install --no-dev --optimize-autoloader --no-interaction --no-progress
+ENV COMPOSER_ALLOW_SUPERUSER 1
+RUN composer install --no-dev --optimize-autoloader --no-interaction --no-progress --prefer-dist
 
 # Copy the entire project to the container
 COPY . /var/www/html
 
-# Ensure that settings.php is not overridden and set permissions
-RUN chown -R www-data:www-data /var/www/html
+# Set permissions and create necessary directories
+RUN chown -R www-data:www-data /var/www/html \
+    && mkdir -p sites/default/files \
+    && find sites/default/files -type d -exec chmod 755 {} \; \
+    && find sites/default/files -type f -exec chmod 644 {} \;
 
-# Create the files directory if it doesn't exist and set permissions
-RUN mkdir -p sites/default/files && \\
-    find sites/default/files -type d -exec chmod 755 {} \; && \\
-    find sites/default/files -type f -exec chmod 644 {} \;
 
-# Install Drush globally
-RUN composer global require drush/drush
+# Stage 2: Runtime stage with FrankenPHP and Caddy
+FROM dunglas/frankenphp:1-php8.3
 
-# Add Composer global bin to PATH
-ENV PATH="/root/.composer/vendor/bin:\${PATH}"
+RUN install-php-extensions \
+    apcu \
+    gd \
+    opcache \
+    pdo_mysql \
+    zip
 
-# Optimize Drupal settings
-RUN php -r "opcache_reset();"
+COPY --from=drupal:php8.3 /usr/local/etc/php/conf.d/* /usr/local/etc/php/conf.d/
+COPY --from=build /var/www/html /opt/drupal
+COPY .build/Caddyfile /etc/caddy/Caddyfile
 
-# Stage 2: Final stage
-FROM php:8.3-fpm-alpine AS runtime
+WORKDIR /opt/drupal
 
-# Copy PHP extensions and configurations from the build stage
-COPY --from=build /usr/local/etc/php /usr/local/etc/php
-COPY --from=build /usr/local/lib/php/extensions /usr/local/lib/php/extensions
-COPY --from=build /var/www/html /var/www/html
-
-# Set the appropriate permissions
-RUN chown -R www-data:www-data /var/www/html
-
-# Set working directory
-WORKDIR /var/www/html
-
-# Expose port 9000 for PHP-FPM
-EXPOSE 9000
-
-# Start PHP-FPM
-CMD ["php-fpm"]
+ENV PATH=${PATH}:/opt/drupal/vendor/bin
 EOL
 
-  # Create .build/.dockerignore
-  cat <<EOL > .build/.dockerignore
+  # Create .build/Caddyfile
+  cat <<'EOL' > ./.build/Caddyfile
+{
+	{$CADDY_GLOBAL_OPTIONS}
+
+	frankenphp {
+		{$FRANKENPHP_CONFIG}
+	}
+
+	# https://caddyserver.com/docs/caddyfile/directives#sorting-algorithm
+	order php_server before file_server
+	order php before file_server
+}
+
+{$CADDY_EXTRA_CONFIG}
+
+:80 {
+	root * web/
+	encode zstd br gzip
+
+	@hiddenPhpFilesRegexp path_regexp \..*/.*\.php$
+	error @hiddenPhpFilesRegexp 403
+
+	@notFoundPhpFiles path_regexp /vendor/.*\.php$
+	error @notFoundPhpFiles 404
+
+	@notFoundPhpFilesRegexp path_regexp ^/sites/[^/]+/files/.*\.php$
+	error @notFoundPhpFilesRegexp 404
+
+	@privateDirRegexp path_regexp ^/sites/.*/private/
+	error @privateDirRegexp 403
+
+	@protectedFilesRegexp {
+		not path /.well-known*
+		path_regexp \.(engine|inc|install|make|module|profile|po|sh|.*sql|theme|twig|tpl(\.php)?|xtmpl|yml)(~|\.sw[op]|\.bak|\.orig|\.save)?$|^/(\..*|Entries.*|Repository|Root|Tag|Template|composer\.(json|lock)|web\.config|yarn\.lock|package\.json)$|^\/#.*#$|\.php(~|\.sw[op]|\.bak|\.orig|\.save)$
+	}
+	error @protectedFilesRegexp 403
+
+	@static {
+		file
+		path *.avif *.css *.eot *.gif *.gz *.ico *.jpg *.jpeg *.js *.otf *.pdf *.png *.svg *.ttf *.webp *.woff *.woff2
+	}
+	header @static Cache-Control "max-age=31536000,public,immutable"
+
+	{$CADDY_SERVER_EXTRA_DIRECTIVES}
+
+	php_server
+}
+EOL
+
+  # Create .dockerignore
+  cat <<'EOL' > ./.dockerignore
 .ddev/
 vendor/
 .git/
@@ -212,110 +249,78 @@ web/sites/default/files/
 README.md
 .gitattributes
 EOL
+  "$DDEV" config --update || return 1
+  "$DDEV" composer require drush/drush || return 1
+  "$DDEV" drush site:install --account-name=admin --account-pass=admin --site-name="$site_name" -y || return 1
 
-  # Continue with Drupal installation
-  ddev config --update
-  ddev composer require drush/drush
-  ddev drush site:install --account-name=admin --account-pass=admin --site-name="$site_name" -y
+  "$DDEV" composer require drupal/gin_toolbar:^1.0@rc drupal/gin:^3.0@rc || return 1
+  "$DDEV" drush theme:enable gin -y || return 1
+  "$DDEV" drush config-set system.theme admin gin -y || return 1
 
-  # Install and enable Gin admin theme
-  ddev composer require drupal/gin_toolbar:^1.0@rc drupal/gin:^3.0@rc
-  ddev drush theme:enable gin -y
-  ddev drush config-set system.theme admin gin -y
+  "$DDEV" drush cex -y || return 1
 
-  ddev drush cex -y
-
-  # Create .gitignore file in the project root
-  cat <<EOL > .gitignore
-# Ignore directories generated by Composer
-/vendor/
-/web/core/
-/web/modules/contrib/
-/web/themes/contrib/
-/web/profiles/contrib/
-/web/libraries/
-
-# Ignore files generated by PhpStorm
-/.idea/
-
-/.editorconfig
-/.gitattributes
-/grumphp.yml
-/behat.yml
-/phpunit.xml
-/phpunit.result.cache
-/phpcs.xml
-console/
-
-# Ignore mounts
-web/sites/default/files
-tmp
-private
-.drush
-drush-backups
-.console
-EOL
-
-echo "New Drupal project '$machine_name' created with Gin admin theme and site name '$site_name'."
-
+  printf "New Drupal project '%s' created with Gin admin theme and site name '%s'.\n" "$machine_name" "$site_name"
 }
 
-# Function to remove a Drupal project
 remove_project() {
   local project_name=$1
-  if [ -z "$project_name" ]; then
-    echo "Please provide a project name."
-    exit 1
+  if [[ -z "$project_name" ]]; then
+    printf "Please provide a project name.\n" >&2
+    return 1
   fi
-  ddev stop -a
-  ddev rm -a
-  rm -rf "$project_name"
-  echo "Project $project_name removed."
+  "$DDEV" stop -a || return 1
+  "$DDEV" rm -a || return 1
+  rm -rf "$project_name" || return 1
+  printf "Project %s removed.\n" "$project_name"
 }
 
-# Function to remove all DDEV projects
 remove_all() {
-  ddev stop -a
-  ddev rm -a
-  echo "All DDEV projects removed."
+  "$DDEV" stop -a || return 1
+  "$DDEV" rm -a || return 1
+  printf "All DDEV projects removed.\n"
 }
 
-# Function to build the Docker image
 build_project() {
   local machine_name=$1
-  if [ -z "$machine_name" ]; then
-    echo "Please provide a image name (you can use : for tagging)."
-    exit 1
+  if [[ -z "$machine_name" ]]; then
+    printf "Please provide an image name (you can use : for tagging).\n" >&2
+    return 1
   fi
-  docker build -f .build/Dockerfile -t "${machine_name}" .
-  echo "Docker image '${machine_name}' built successfully."
+  
+  # Copy Dockerfile and Caddyfile to .build
+  cp ./build-files/Dockerfile .build/Dockerfile
+  cp ./build-files/Caddyfile .build/Caddyfile
+
+  docker build -f .build/Dockerfile -t "${machine_name}" . || return 1
+  printf "Docker image '%s' built successfully.\n" "${machine_name}"
 }
 
-# Main script logic
-if [ "$#" -lt 1 ]; then
-  echo "Usage: drupal-lab {new-project|remove-project|remove-all|build} [project-name]"
-  exit 1
-fi
+main() {
+  if [[ "$#" -lt 1 ]]; then
+    printf "Usage: drupal-lab {new-project|remove-project|remove-all|build} [project-name]\n" >&2
+    return 1
+  fi
 
-# Check if DDEV is installed
-check_ddev
+  check_ddev || return 1
 
-# Parse command
-case "$1" in
-  new-project)
-    new_project "$2"
-    ;;
-  remove-project)
-    remove_project "$2"
-    ;;
-  remove-all)
-    remove_all
-    ;;
-  build)
-    build_project "$2"
-    ;;
-  *)
-    echo "Invalid command. Usage: drupal-lab {new-project|remove-project|remove-all|build} [project-name]"
-    exit 1
-    ;;
-esac
+  case "$1" in
+    new)
+      new_project "$2"
+      ;;
+    remove)
+      remove_project "$2"
+      ;;
+    remove-all)
+      remove_all
+      ;;
+    build)
+      build_project "$2"
+      ;;
+    *)
+      printf "Invalid command. Usage: drupal-lab {new-project|remove-project|remove-all|build} [project-name]\n" >&2
+      return 1
+      ;;
+  esac
+}
+
+main "$@"
