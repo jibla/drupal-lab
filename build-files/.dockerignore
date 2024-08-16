@@ -1,0 +1,11 @@
+.ddev/
+vendor/
+.git/
+.github/
+node_modules/
+tests/
+build/
+web/sites/default/files/
+.env
+README.md
+.gitattributes
